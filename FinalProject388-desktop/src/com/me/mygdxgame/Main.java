@@ -9,7 +9,7 @@ public class Main {
 		cfg.title = "BALL Buster";
 		cfg.useGL20 = true;
 		cfg.width = 500;
-		cfg.height = 500;
+		cfg.height = 800;
 		
 		new LwjglApplication(new MyGdxGame(), cfg);
 	}

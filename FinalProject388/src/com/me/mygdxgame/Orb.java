@@ -7,6 +7,7 @@ import com.badlogic.gdx.math.Vector2;
 
 public class Orb extends Sprite {
 
+	private boolean toDelete;
 	private OrbColor color;
 	private Rectangle rect;
 	private Vector2 orbRowColumn;
@@ -18,6 +19,7 @@ public class Orb extends Sprite {
 		setPosition(xPosition, yPosition);
 		orbLocation = new Vector2(xPosition, yPosition);
 		color = oc;
+		toDelete = false;
 	}
 
 	@Override
@@ -25,7 +27,19 @@ public class Orb extends Sprite {
 		super.setPosition(xPosition, yPosition);
 		rect.setPosition(new Vector2(xPosition, yPosition));
 	}
+	
+	public void resetToDelete(){
+		toDelete = false;
+	}
+	
+	public void setToDelete(){
+		toDelete = true;
+	}
 
+	public boolean getTaken(){
+		return toDelete;
+	}
+	
 	public OrbColor getOrbColor() {
 		return color;
 	}

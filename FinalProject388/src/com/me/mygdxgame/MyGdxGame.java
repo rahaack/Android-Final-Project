@@ -16,36 +16,41 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 
 public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
-	ShapeRenderer shapeRenderer;
-	ActionResolver actionResolver;
+	private ShapeRenderer shapeRenderer;
+	private ActionResolver actionResolver;
 
 	public float screenWidth;
 	public float screenHeight;
 
 	private float touchX;
 	private float touchY;
-	int rows;
-	int columns;
+	private int rows;
+	private int columns;
 	private int numberOfOrbsMatched;
+	private int numberOfTurns;
 
 	private Orb[][] orbs;
 	private Orb currentOrb;
 
 	Vector2 position;
-	Rectangle testRect;
 
-	Skin skin;
-	Stage stage;
-	Label score;
-	Label match;
+	private Skin skin;
+	private Stage stage;
+	private Label score;
+	private Label match;
+	private Label turns;
+	private TextButton newGame;
 
 	public MyGdxGame(ActionResolver actionResolver) {
 		this.actionResolver = actionResolver;
@@ -58,16 +63,18 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 
 	@Override
 	public void create() {
-
 		batch = new SpriteBatch();
 		shapeRenderer = new ShapeRenderer();
+
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
 
+		numberOfTurns = 0;
 		numberOfOrbsMatched = 0;
-
 		rows = 5;
 		columns = 4;
+
+		// Generate initial balls
 		orbs = generateInitialField(rows, columns);
 		checkForMatches(orbs);
 		int numOfOrbs = getNumberOfMatches(orbs);
@@ -77,27 +84,43 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 			resetMatchedOrbs(orbs);
 		}
 
-		testRect = new Rectangle();
-		testRect.x = 5;
-		testRect.y = 1700;
-		testRect.width = Gdx.graphics.getWidth() - 10;
-		testRect.height = 13;
-
 		// camera = new OrthographicCamera(1, h/w);
-		InputMultiplexer inputMult = new InputMultiplexer();
-		Gdx.input.setInputProcessor(this);
 
 		skin = new Skin(Gdx.files.internal("data/uiskin.json"));
 		stage = new Stage(1000, 1000, false);
-		score = new Label("SCORE: ", skin);
-		match = new Label("MATCHED: ", skin);
+		score = new Label("Score: 0", skin);
+		match = new Label("Matched: 0", skin);
+		turns = new Label("Turns: 0", skin);
+		newGame = new TextButton("New Game!", skin);
 		stage.addActor(score);
-		stage.addActor(match);
-		score.setPosition(30, 900);
-		match.setPosition(30, 830);
+		score.setPosition(35, 920);
 		score.setFontScale(3);
+		
+		stage.addActor(match);
+		match.setPosition(35, 850);
 		match.setFontScale(3);
-		// Gdx.input.setInputProcessor(stage);
+		
+		stage.addActor(turns);
+		turns.setPosition(350, 920);
+		turns.setFontScale(3);
+		
+		stage.addActor(newGame);
+		newGame.setBounds(750, 900, 200, 80);
+		newGame.addListener(new ClickListener() {
+			@Override
+			public void clicked(InputEvent event, float x, float y) {
+				score.setText("Score: 0");
+				match.setText("Matched: 0");
+				turns.setText("Turns: 0");
+				numberOfTurns = 0;
+				numberOfOrbsMatched = 0;
+			}
+		});
+
+		InputMultiplexer inputMult = new InputMultiplexer();
+		inputMult.addProcessor(stage);
+		inputMult.addProcessor(this);
+		Gdx.input.setInputProcessor(inputMult);
 	}
 
 	@Override
@@ -122,9 +145,8 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 			for (int column = 0; column < columns; column++) {
 				if (orbs[row][column].getTaken()) {
 					orbs[row][column].getAnimatedSprite().draw(batch);
+					match.setText("Matched: " + getNumberOfMatches(orbs));
 					if (orbs[row][column].getAnimatedSprite().isAnimationFinished()) {
-
-						match.setText("Matched: " + getNumberOfMatches(orbs));
 						numberOfOrbsMatched += getNumberOfMatches(orbs);
 						resetMatchedOrbs(orbs);
 						checkForMatches(orbs);
@@ -180,8 +202,12 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 			currentOrb.setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
 		currentOrb = null;
 
+		numberOfTurns++;
+		turns.setText("Turns: " + numberOfTurns);
+
 		checkForMatches(orbs);
 		int orbsToDelete = getNumberOfMatches(orbs);
+		match.setText("Matched: " + orbsToDelete);
 		if (orbsToDelete == 0) {
 			// actionResolver.showAlertBox("You SUCK", "You matched " +
 			// orbsToDelete + " orbs", "Try and suck AGAIN!!");
@@ -304,12 +330,12 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private Orb[][] generateInitialField(int numberOfRows, int numberOfColumns) {
 
 		Orb[][] orb = new Orb[numberOfRows][numberOfColumns];
-		float xPosition = 0;
-		float yPosition = 0;
+		float xPosition = 10;
+		float yPosition = 10;
 		int xLocation = (int) (screenWidth / numberOfColumns);
 
 		for (int row = 0; row < numberOfRows; row++) {
-			xPosition = 0;
+			xPosition = 10;
 			for (int column = 0; column < numberOfColumns; column++) {
 				generateRandomOrb(orb, xPosition, yPosition, row, column);
 				xPosition += xLocation;

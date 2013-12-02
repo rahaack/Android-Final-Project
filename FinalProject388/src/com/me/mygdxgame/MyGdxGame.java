@@ -1,26 +1,25 @@
 package com.me.mygdxgame;
 
-import java.util.ArrayList;
 import java.util.Random;
-
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input.Keys;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.Texture.TextureFilter;
-import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.input.GestureDetector.GestureListener;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
 
 public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private OrthographicCamera camera;
@@ -35,12 +34,18 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private float touchY;
 	int rows;
 	int columns;
+	private int numberOfOrbsMatched;
 
 	private Orb[][] orbs;
 	private Orb currentOrb;
 
 	Vector2 position;
 	Rectangle testRect;
+
+	Skin skin;
+	Stage stage;
+	Label score;
+	Label match;
 
 	public MyGdxGame(ActionResolver actionResolver) {
 		this.actionResolver = actionResolver;
@@ -53,14 +58,24 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 
 	@Override
 	public void create() {
+
 		batch = new SpriteBatch();
 		shapeRenderer = new ShapeRenderer();
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
 
+		numberOfOrbsMatched = 0;
+
 		rows = 5;
 		columns = 4;
 		orbs = generateInitialField(rows, columns);
+		checkForMatches(orbs);
+		int numOfOrbs = getNumberOfMatches(orbs);
+		while (numOfOrbs != 0) {
+			checkForMatches(orbs);
+			numOfOrbs = getNumberOfMatches(orbs);
+			resetMatchedOrbs(orbs);
+		}
 
 		testRect = new Rectangle();
 		testRect.x = 5;
@@ -69,36 +84,61 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 		testRect.height = 13;
 
 		// camera = new OrthographicCamera(1, h/w);
-
-		
-
+		InputMultiplexer inputMult = new InputMultiplexer();
 		Gdx.input.setInputProcessor(this);
+
+		skin = new Skin(Gdx.files.internal("data/uiskin.json"));
+		stage = new Stage(1000, 1000, false);
+		score = new Label("SCORE: ", skin);
+		match = new Label("MATCHED: ", skin);
+		stage.addActor(score);
+		stage.addActor(match);
+		score.setPosition(30, 900);
+		match.setPosition(30, 830);
+		score.setFontScale(3);
+		match.setFontScale(3);
+		// Gdx.input.setInputProcessor(stage);
 	}
 
 	@Override
 	public void dispose() {
 		batch.dispose();
+		stage.dispose();
+		skin.dispose();
 	}
 
 	@Override
 	public void render() {
 		Gdx.gl.glClearColor(1, 1, 1, 1);
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT | GL10.GL_DEPTH_BUFFER_BIT);
+		stage.act(Math.min(Gdx.graphics.getDeltaTime(), 1 / 30f));
+		stage.draw();
+
+		batch.begin();
 
 		// batch.setProjectionMatrix(camera.combined);
-		batch.begin();
+
 		for (int row = 0; row < rows; row++) {
 			for (int column = 0; column < columns; column++) {
-				orbs[row][column].draw(batch);
+				if (orbs[row][column].getTaken()) {
+					orbs[row][column].getAnimatedSprite().draw(batch);
+					if (orbs[row][column].getAnimatedSprite().isAnimationFinished()) {
+
+						match.setText("Matched: " + getNumberOfMatches(orbs));
+						numberOfOrbsMatched += getNumberOfMatches(orbs);
+						resetMatchedOrbs(orbs);
+						checkForMatches(orbs);
+						score.setText("Score: " + numberOfOrbsMatched);
+					}
+				} else {
+					orbs[row][column].draw(batch);
+				}
+
 			}
 		}
 
 		batch.end();
 
-		shapeRenderer.begin(ShapeType.Filled);
-		shapeRenderer.setColor(new Color(0, 100, 100, 1));
-		shapeRenderer.rect(100, 1600, 1000, 30);
-		shapeRenderer.end();
 	}
 
 	private void drawOrbRect(Orb orb) {
@@ -122,6 +162,77 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 	public void resume() {
 	}
 
+	@Override
+	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+		touchX = screenX;
+		touchY = screenY;
+		if (currentOrb == null)
+			currentOrb = getOrb(touchX, touchY);
+
+		// System.out.println("TouchX:" + touchX);
+		// System.out.println("TouchY:" + touchY);
+		return true;
+	}
+
+	@Override
+	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+		if (currentOrb != null)
+			currentOrb.setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
+		currentOrb = null;
+
+		checkForMatches(orbs);
+		int orbsToDelete = getNumberOfMatches(orbs);
+		if (orbsToDelete == 0) {
+			// actionResolver.showAlertBox("You SUCK", "You matched " +
+			// orbsToDelete + " orbs", "Try and suck AGAIN!!");
+		} else if (orbsToDelete < 11) {
+			// actionResolver.showAlertBox("GOOD JOB", "You matched " +
+			// orbsToDelete + " orbs", "AGAIN!!");
+		} else {
+			// actionResolver.showAlertBox("YOU'RE AMAZING", "You matched " +
+			// orbsToDelete + " orbs", "AGAIN!!");
+		}
+
+		return true;
+	}
+
+	@Override
+	public boolean touchDragged(int screenX, int screenY, int pointer) {
+
+		if (currentOrb != null) {
+			// if it is not over
+			for (int row = 0; row < rows; row++) {
+				for (int column = 0; column < columns; column++) {
+					if (currentOrb != orbs[row][column]
+							&& currentOrb.getBoundingRectangle().overlaps(orbs[row][column].getBoundingRectangle())) {
+						System.out.println("touching: " + orbs[row][column].getOrbColor());
+
+						Vector2 temp = orbs[row][column].getLocation();
+						orbs[row][column].setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
+						orbs[row][column].setLocation(currentOrb.getLocation().x, currentOrb.getLocation().y);
+						orbs[row][column].setOrbRowColumn((int) currentOrb.getOrbRowColumn().x,
+								(int) currentOrb.getOrbRowColumn().y);
+
+						// swap
+						orbs[(int) currentOrb.getOrbRowColumn().x][(int) currentOrb.getOrbRowColumn().y] = orbs[row][column];
+						orbs[row][column] = currentOrb;
+
+						currentOrb.setOrbRowColumn(row, column);
+						currentOrb.setLocation(temp.x, temp.y);
+
+					}
+				}
+			}
+
+			touchX = screenX;
+			touchY = screenY;
+			currentOrb.setPosition(screenX - currentOrb.getWidth() / 2, screenHeight - screenY - currentOrb.getWidth() / 2);
+
+		}
+
+		return true;
+	}
+
 	private void checkForMatches(Orb[][] orb) {
 		for (int row = 0; row < rows; row++) {
 			for (int column = 0; column < columns - 2; column++) {
@@ -136,20 +247,6 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 			}
 		}
 
-	}
-
-	private int deleteMatchesAndReset(Orb[][] orb) {
-		int matches = 0;
-		for (int row = 0; row < rows; row++) {
-			for (int column = 0; column < columns; column++) {
-				if (orb[row][column].getTaken() == true) {
-					matches++;
-					generateRandomOrb(orb, orb[row][column].getLocation().x, orb[row][column].getLocation().y, row, column);
-					// orb[row][column].resetToDelete();
-				}
-			}
-		}
-		return matches;
 	}
 
 	private void checkDown(Orb[][] orb, int row, int column, OrbColor colorToMatch) {
@@ -179,7 +276,29 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 				 */
 			}
 		}
+	}
 
+	private int getNumberOfMatches(Orb[][] orb) {
+		int matches = 0;
+		for (int row = 0; row < rows; row++) {
+			for (int column = 0; column < columns; column++) {
+				if (orb[row][column].getTaken() == true) {
+					matches++;
+				}
+			}
+		}
+		return matches;
+	}
+
+	private void resetMatchedOrbs(Orb[][] orb) {
+		for (int row = 0; row < rows; row++) {
+			for (int column = 0; column < columns; column++) {
+				if (orb[row][column].getTaken() == true) {
+					generateRandomOrb(orb, orb[row][column].getLocation().x, orb[row][column].getLocation().y, row, column);
+					orb[row][column].resetToDelete();
+				}
+			}
+		}
 	}
 
 	private Orb[][] generateInitialField(int numberOfRows, int numberOfColumns) {
@@ -223,53 +342,6 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 		return rand.nextInt((max - min) + 1) + min;
 	}
 
-	@Override
-	public boolean touchDragged(int screenX, int screenY, int pointer) {
-
-		if (currentOrb != null) {
-			for (int row = 0; row < rows; row++) {
-				for (int column = 0; column < columns; column++) {
-					if (currentOrb != orbs[row][column]
-							&& currentOrb.getBoundingRectangle().overlaps(orbs[row][column].getBoundingRectangle())) {
-						// System.out.println("touching: " +
-						// orbs[row][column].getOrbColor());
-
-						Vector2 temp = orbs[row][column].getLocation();
-						orbs[row][column].setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
-						orbs[row][column].setLocation(currentOrb.getLocation().x, currentOrb.getLocation().y);
-						orbs[row][column].setOrbRowColumn((int) currentOrb.getOrbRowColumn().x,
-								(int) currentOrb.getOrbRowColumn().y);
-
-						// swap
-						orbs[(int) currentOrb.getOrbRowColumn().x][(int) currentOrb.getOrbRowColumn().y] = orbs[row][column];
-						orbs[row][column] = currentOrb;
-
-						currentOrb.setOrbRowColumn(row, column);
-						currentOrb.setLocation(temp.x, temp.y);
-					}
-				}
-			}
-
-			touchX = screenX;
-			touchY = screenY;
-			currentOrb.setPosition(screenX - currentOrb.getWidth() / 2, screenHeight - screenY - currentOrb.getWidth() / 2);
-
-		}
-
-		return true;
-	}
-
-	@Override
-	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-		touchX = screenX;
-		touchY = screenY;
-		if (currentOrb == null)
-			currentOrb = getOrb(touchX, touchY);
-		// System.out.println("TouchX:" + touchX);
-		// System.out.println("TouchY:" + touchY);
-		return true;
-	}
-
 	private Orb getOrb(float touchX, float touchY) {
 		for (int row = 0; row < rows; row++) {
 			for (int column = 0; column < columns; column++) {
@@ -283,26 +355,6 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private boolean isThisOrb(Orb sprite, float touchX, float touchY) {
 		return touchX > (sprite.getX()) && touchX < (sprite.getX() + sprite.getWidth())
 				&& touchY > (screenHeight - sprite.getY() - sprite.getWidth()) && touchY < (screenHeight - sprite.getY());
-	}
-
-	@Override
-	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-		if (currentOrb != null)
-			currentOrb.setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
-		currentOrb = null;
-		checkForMatches(orbs);
-		int orbsToDelete = deleteMatchesAndReset(orbs);
-		if (orbsToDelete == 0) {
-			actionResolver.showAlertBox("You SUCK", "You matched " + orbsToDelete + " orbs", "Try and suck AGAIN!!");
-		} else {
-			actionResolver.showAlertBox("GOOD JOB", "You matched " + orbsToDelete + " orbs", "AGAIN!!");
-		}
-		while (orbsToDelete != 0) {
-			System.out.println("Deleted:" + orbsToDelete);
-			checkForMatches(orbs);
-			orbsToDelete = deleteMatchesAndReset(orbs);
-		}
-		return true;
 	}
 
 	@Override

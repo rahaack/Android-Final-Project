@@ -160,7 +160,7 @@ public class GameScreen implements InputProcessor, Screen {
 
 		batch.end();
 
-		if (numberOfTurns == maxTurns && getNumberOfMatches(orbs) == 0) {
+		if (numberOfTurns >= maxTurns && getNumberOfMatches(orbs) == 0) {
 			actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
 			score.setText("Score: 0");
 			match.setText("Matched: 0");
@@ -185,6 +185,7 @@ public class GameScreen implements InputProcessor, Screen {
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
 
+		swapped = null;
 		touchX = screenX;
 		touchY = screenY;
 		if (currentOrb == null)

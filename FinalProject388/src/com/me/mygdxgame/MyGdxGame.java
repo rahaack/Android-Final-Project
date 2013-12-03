@@ -39,6 +39,7 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 	private int columns;
 	private int numberOfOrbsMatched;
 	private int numberOfTurns;
+	private int maxTurns;
 
 	private Orb[][] orbs;
 	private Orb currentOrb;
@@ -69,6 +70,7 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
 
+		maxTurns = 5;
 		numberOfTurns = 0;
 		numberOfOrbsMatched = 0;
 		rows = 5;
@@ -90,20 +92,20 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 		stage = new Stage(1000, 1000, false);
 		score = new Label("Score: 0", skin);
 		match = new Label("Matched: 0", skin);
-		turns = new Label("Turns: 0", skin);
+		turns = new Label("Turns: 0/" + maxTurns, skin);
 		newGame = new TextButton("New Game!", skin);
 		stage.addActor(score);
 		score.setPosition(35, 920);
 		score.setFontScale(3);
-		
+
 		stage.addActor(match);
 		match.setPosition(35, 850);
 		match.setFontScale(3);
-		
+
 		stage.addActor(turns);
 		turns.setPosition(350, 920);
 		turns.setFontScale(3);
-		
+
 		stage.addActor(newGame);
 		newGame.setBounds(750, 900, 200, 80);
 		newGame.addListener(new ClickListener() {
@@ -111,9 +113,10 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 			public void clicked(InputEvent event, float x, float y) {
 				score.setText("Score: 0");
 				match.setText("Matched: 0");
-				turns.setText("Turns: 0");
+				turns.setText("Turns: 0/" + maxTurns);
 				numberOfTurns = 0;
 				numberOfOrbsMatched = 0;
+				actionResolver.showToast("Start BallBuster", 5000);
 			}
 		});
 
@@ -158,8 +161,17 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 
 			}
 		}
-
+		
 		batch.end();
+		
+		if (numberOfTurns == maxTurns && getNumberOfMatches(orbs) == 0) {
+			actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
+			score.setText("Score: 0");
+			match.setText("Matched: 0");
+			turns.setText("Turns: 0/" + maxTurns);
+			numberOfTurns = 0;
+			numberOfOrbsMatched = 0;
+		}
 
 	}
 
@@ -186,13 +198,12 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+		
 		touchX = screenX;
 		touchY = screenY;
 		if (currentOrb == null)
 			currentOrb = getOrb(touchX, touchY);
 
-		// System.out.println("TouchX:" + touchX);
-		// System.out.println("TouchY:" + touchY);
 		return true;
 	}
 
@@ -203,49 +214,51 @@ public class MyGdxGame implements ApplicationListener, InputProcessor {
 		currentOrb = null;
 
 		numberOfTurns++;
-		turns.setText("Turns: " + numberOfTurns);
+		turns.setText("Turns: " + numberOfTurns +"/" + maxTurns);
 
 		checkForMatches(orbs);
 		int orbsToDelete = getNumberOfMatches(orbs);
 		match.setText("Matched: " + orbsToDelete);
-		if (orbsToDelete == 0) {
-			// actionResolver.showAlertBox("You SUCK", "You matched " +
-			// orbsToDelete + " orbs", "Try and suck AGAIN!!");
-		} else if (orbsToDelete < 11) {
-			// actionResolver.showAlertBox("GOOD JOB", "You matched " +
-			// orbsToDelete + " orbs", "AGAIN!!");
-		} else {
-			// actionResolver.showAlertBox("YOU'RE AMAZING", "You matched " +
-			// orbsToDelete + " orbs", "AGAIN!!");
-		}
 
 		return true;
 	}
 
+	Orb swapped = null;
+
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {
 
+		boolean orbTouched = false;
+
 		if (currentOrb != null) {
-			// if it is not over
-			for (int row = 0; row < rows; row++) {
-				for (int column = 0; column < columns; column++) {
-					if (currentOrb != orbs[row][column]
-							&& currentOrb.getBoundingRectangle().overlaps(orbs[row][column].getBoundingRectangle())) {
-						System.out.println("touching: " + orbs[row][column].getOrbColor());
+			if (swapped != null && currentOrb.getBoundingRectangle().overlaps(swapped.getBoundingRectangle())) {
+				System.out.println("Swapped");
+			} else {
+				swapped = null;
+				// if it is not over
+				for (int row = 0; row < rows; row++) {
+					for (int column = 0; column < columns; column++) {
+						if (currentOrb != orbs[row][column]
+								&& currentOrb.getBoundingRectangle().overlaps(orbs[row][column].getBoundingRectangle())
+								&& orbTouched == false) {
+							System.out.println("touching: " + orbs[row][column].getOrbColor());
 
-						Vector2 temp = orbs[row][column].getLocation();
-						orbs[row][column].setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
-						orbs[row][column].setLocation(currentOrb.getLocation().x, currentOrb.getLocation().y);
-						orbs[row][column].setOrbRowColumn((int) currentOrb.getOrbRowColumn().x,
-								(int) currentOrb.getOrbRowColumn().y);
+							Vector2 temp = orbs[row][column].getLocation();
 
-						// swap
-						orbs[(int) currentOrb.getOrbRowColumn().x][(int) currentOrb.getOrbRowColumn().y] = orbs[row][column];
-						orbs[row][column] = currentOrb;
+							orbs[row][column].setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
+							orbs[row][column].setLocation(currentOrb.getLocation().x, currentOrb.getLocation().y);
+							orbs[row][column].setOrbRowColumn((int) currentOrb.getOrbRowColumn().x,
+									(int) currentOrb.getOrbRowColumn().y);
+							swapped = orbs[row][column];
 
-						currentOrb.setOrbRowColumn(row, column);
-						currentOrb.setLocation(temp.x, temp.y);
+							// swap
+							orbs[(int) currentOrb.getOrbRowColumn().x][(int) currentOrb.getOrbRowColumn().y] = orbs[row][column];
+							orbs[row][column] = currentOrb;
 
+							currentOrb.setOrbRowColumn(row, column);
+							currentOrb.setLocation(temp.x, temp.y);
+							orbTouched = true;
+						}
 					}
 				}
 			}

@@ -14,6 +14,10 @@ public class HighScore {
 		return score;
 	}
 	
+	public String getName(){
+		return initials;
+	}
+	
 	public String getHighScoreString(){
 		return initials + "  " + score;
 	}

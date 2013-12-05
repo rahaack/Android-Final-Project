@@ -1,14 +1,12 @@
 package com.me.mygdxgame;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.TextInputListener;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL10;
@@ -70,17 +68,8 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	public void create() {
 		batch = new SpriteBatch();
 		shapeRenderer = new ShapeRenderer();
-		highScoreList = new ArrayList<HighScore>();
-		highScoreList.add(new HighScore("RAH", 100));
-		highScoreList.add(new HighScore("BLH", 90));
-		highScoreList.add(new HighScore("GMP", 80));
-		highScoreList.add(new HighScore("LMW", 70));
-		highScoreList.add(new HighScore("RAH", 60));
-		highScoreList.add(new HighScore("ABC", 50));
-		highScoreList.add(new HighScore("ABC", 40));
-		highScoreList.add(new HighScore("ABC", 30));
-		highScoreList.add(new HighScore("ABC", 20));
-		highScoreList.add(new HighScore("ABC", 10));
+		
+		createHighScoreList();
 
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
@@ -157,6 +146,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		Gdx.input.setInputProcessor(inputMult);
 	}
 
+	
 	@Override
 	public void dispose() {
 		shapeRenderer.dispose();
@@ -220,11 +210,12 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	@Override
 	public void input(String text) {
 		HighScore scoreToAdd = new HighScore(text, tempNumber);
-		for (int i = highScoreList.size()-1; i > 0; i--) {
+		for (int i = highScoreList.size() - 1; i > 0; i--) {
 			if (scoreToAdd.getScore() > highScoreList.get(i).getScore()
 					&& scoreToAdd.getScore() < highScoreList.get(i - 1).getScore()) {
 				highScoreList.add(i, scoreToAdd);
 				highScoreList.remove(highScoreList.size() - 1);
+				setPreferences();
 			}
 		}
 	}
@@ -233,6 +224,38 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	public void canceled() {
 		// TODO Auto-generated method stub
 
+	}
+	
+	private void createHighScoreList() {
+		highScoreList = new ArrayList<HighScore>();
+		Preferences prefs = Gdx.app.getPreferences("Scores");
+		if (prefs.getInteger("score0") == 0) {
+			highScoreList.add(new HighScore("RAH", 100));
+			highScoreList.add(new HighScore("BLH", 80));
+			highScoreList.add(new HighScore("GMP", 60));
+			highScoreList.add(new HighScore("LMW", 50));
+			highScoreList.add(new HighScore("RAH", 40));
+			highScoreList.add(new HighScore("ABC", 30));
+			highScoreList.add(new HighScore("ABC", 20));
+			highScoreList.add(new HighScore("ABC", 15));
+			highScoreList.add(new HighScore("ABC", 10));
+			highScoreList.add(new HighScore("ABC", 5));
+		} else {
+			for (int i = 0; i < 10; i++) {
+				highScoreList.add(new HighScore(prefs.getString("name" + i), prefs.getInteger("score" + i)));
+			}
+		}
+		setPreferences();
+	}
+
+
+	private void setPreferences() {
+		Preferences prefs = Gdx.app.getPreferences("Scores");
+		for (int i = 0; i < highScoreList.size(); i++) {
+			prefs.putString("name" + i, highScoreList.get(i).getName());
+			prefs.putInteger("score" + i, highScoreList.get(i).getScore());
+		}
+		prefs.flush();
 	}
 
 	private void drawOrbRect(Orb orb) {

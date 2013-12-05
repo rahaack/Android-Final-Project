@@ -1,7 +1,12 @@
 package com.me.mygdxgame;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.TextInputListener;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
@@ -20,7 +25,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 
-public class GameScreen implements InputProcessor, Screen {
+public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	private MyGdxGame myGame;
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
@@ -47,12 +52,15 @@ public class GameScreen implements InputProcessor, Screen {
 	private Label match;
 	private Label turns;
 	private TextButton newGame;
+	private TextButton highScore;
+
+	private ArrayList<HighScore> highScoreList;
 
 	public GameScreen(MyGdxGame myGdxGame, ActionResolver actionResolver) {
 		this.actionResolver = actionResolver;
 		myGame = myGdxGame;
-		actionResolver.showToast("Start BallBuster", 5000);
 		create();
+		actionResolver.showToast("Go!", 5000);
 	}
 
 	public GameScreen() {
@@ -62,12 +70,23 @@ public class GameScreen implements InputProcessor, Screen {
 	public void create() {
 		batch = new SpriteBatch();
 		shapeRenderer = new ShapeRenderer();
+		highScoreList = new ArrayList<HighScore>();
+		highScoreList.add(new HighScore("RAH", 100));
+		highScoreList.add(new HighScore("BLH", 90));
+		highScoreList.add(new HighScore("GMP", 80));
+		highScoreList.add(new HighScore("LMW", 70));
+		highScoreList.add(new HighScore("RAH", 60));
+		highScoreList.add(new HighScore("ABC", 50));
+		highScoreList.add(new HighScore("ABC", 40));
+		highScoreList.add(new HighScore("ABC", 30));
+		highScoreList.add(new HighScore("ABC", 20));
+		highScoreList.add(new HighScore("ABC", 10));
 
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
 
 		maxTurns = 5;
-		numberOfTurns = -1;//to offset initial touch up
+		numberOfTurns = -1;// to offset initial touch up
 		numberOfOrbsMatched = 0;
 		rows = 5;
 		columns = 4;
@@ -90,6 +109,8 @@ public class GameScreen implements InputProcessor, Screen {
 		match = new Label("Matched: 0", skin);
 		turns = new Label("Turns: 0/" + maxTurns, skin);
 		newGame = new TextButton("New Game!", skin);
+		highScore = new TextButton("High Scores", skin);
+
 		stage.addActor(score);
 		score.setPosition(35, 920);
 		score.setFontScale(3);
@@ -103,7 +124,7 @@ public class GameScreen implements InputProcessor, Screen {
 		turns.setFontScale(3);
 
 		stage.addActor(newGame);
-		newGame.setBounds(750, 900, 200, 80);
+		newGame.setBounds(750, 900, 200, 70);
 		newGame.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
@@ -116,6 +137,20 @@ public class GameScreen implements InputProcessor, Screen {
 			}
 		});
 
+		stage.addActor(highScore);
+		highScore.setBounds(750, 820, 200, 70);
+		highScore.addListener(new ClickListener() {
+			@Override
+			public void clicked(InputEvent event, float x, float y) {
+				StringBuilder sb = new StringBuilder();
+				for (HighScore score : highScoreList) {
+					sb.append(System.getProperty("line.separator"));
+					sb.append(score.getHighScoreString());
+				}
+				actionResolver.showAlertBox("High Scores -  5 Turns", sb.toString(), "Return");
+			}
+		});
+
 		InputMultiplexer inputMult = new InputMultiplexer();
 		inputMult.addProcessor(stage);
 		inputMult.addProcessor(this);
@@ -124,6 +159,7 @@ public class GameScreen implements InputProcessor, Screen {
 
 	@Override
 	public void dispose() {
+		shapeRenderer.dispose();
 		batch.dispose();
 		stage.dispose();
 		skin.dispose();
@@ -161,13 +197,41 @@ public class GameScreen implements InputProcessor, Screen {
 		batch.end();
 
 		if (numberOfTurns >= maxTurns && getNumberOfMatches(orbs) == 0) {
-			actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
 			score.setText("Score: 0");
 			match.setText("Matched: 0");
 			turns.setText("Turns: 0/" + maxTurns);
 			numberOfTurns = 0;
+
+			tempNumber = numberOfOrbsMatched;
+
+			if (tempNumber > (highScoreList.get(highScoreList.size() - 1).getScore())) {
+				Gdx.input.getTextInput(this, "New High Score!", "AAA");
+			} else {
+				actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
+			}
+
 			numberOfOrbsMatched = 0;
 		}
+
+	}
+
+	int tempNumber;
+
+	@Override
+	public void input(String text) {
+		HighScore scoreToAdd = new HighScore(text, tempNumber);
+		for (int i = highScoreList.size()-1; i > 0; i--) {
+			if (scoreToAdd.getScore() > highScoreList.get(i).getScore()
+					&& scoreToAdd.getScore() < highScoreList.get(i - 1).getScore()) {
+				highScoreList.add(i, scoreToAdd);
+				highScoreList.remove(highScoreList.size() - 1);
+			}
+		}
+	}
+
+	@Override
+	public void canceled() {
+		// TODO Auto-generated method stub
 
 	}
 
@@ -179,8 +243,6 @@ public class GameScreen implements InputProcessor, Screen {
 		shapeRenderer.end();
 
 	}
-
-
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
@@ -415,32 +477,33 @@ public class GameScreen implements InputProcessor, Screen {
 
 	@Override
 	public void show() {
-		// TODO Auto-generated method stub
-
+		InputMultiplexer inputMult = new InputMultiplexer();
+		inputMult.addProcessor(stage);
+		inputMult.addProcessor(this);
+		Gdx.input.setInputProcessor(inputMult);
 	}
 
 	@Override
 	public void hide() {
-		// TODO Auto-generated method stub
-
+		Gdx.input.setInputProcessor(null);
 	}
 
 	@Override
 	public void resize(int width, int height) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void pause() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void resume() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 }

@@ -17,20 +17,23 @@ public class MyGdxGame extends Game {
 	}
 
 	@Override
-	public void create() { 
+	public void create() {
 		splash = new SplashScreen(this);
 		setScreen(splash);
 	}
 
-	public Screen getGame(){
+	public Screen createGameScreen() {
 		game = new GameScreen(this, actionResolver);
 		return game;
 	}
-	
+
+	public Screen getGameScreen() {
+		return game;
+	}
+
+
 	@Override
 	public void dispose() {
-		// TODO Auto-generated method stub
-
 	}
 
 }

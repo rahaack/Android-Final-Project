@@ -12,16 +12,21 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 
 public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	private MyGdxGame myGame;
@@ -40,6 +45,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	private int numberOfOrbsMatched;
 	private int numberOfTurns;
 	private int maxTurns;
+	private int maxTime;
 
 	private Orb[][] orbs;
 	private Orb currentOrb;
@@ -48,11 +54,17 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	private Stage stage;
 	private Label score;
 	private Label match;
-	private Label turns;
-	private TextButton newGame;
-	private TextButton highScore;
+	private Label turnsOrTimer;
+	private TextButton newGameTurn;
+	private TextButton newGameTime;
+	private TextButton highScoreTurn;
+	private TextButton highScoreTime;
 
-	private ArrayList<HighScore> highScoreList;
+	private boolean turnGame;
+	Timer time;
+
+	private ArrayList<HighScore> highScoreListTurn;
+	private ArrayList<HighScore> highScoreListTime;
 
 	public GameScreen(MyGdxGame myGdxGame, ActionResolver actionResolver) {
 		this.actionResolver = actionResolver;
@@ -68,13 +80,15 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	public void create() {
 		batch = new SpriteBatch();
 		shapeRenderer = new ShapeRenderer();
-		
+
 		createHighScoreList();
 
 		screenWidth = Gdx.graphics.getWidth(); // 1200
 		screenHeight = Gdx.graphics.getHeight(); // 1824
 
+		turnGame = true;
 		maxTurns = 5;
+		maxTime = 30;
 		numberOfTurns = -1;// to offset initial touch up
 		numberOfOrbsMatched = 0;
 		rows = 5;
@@ -92,51 +106,89 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 
 		// camera = new OrthographicCamera(1, h/w);
 
-		skin = new Skin(Gdx.files.internal("data/uiskin.json"));
+		skin = new Skin(Gdx.files.internal("data/uiskin.json"), new TextureAtlas(Gdx.files.internal("data/uiskin.atlas")));
 		stage = new Stage(1000, 1000, false);
-		score = new Label("Score: 0", skin);
-		match = new Label("Matched: 0", skin);
-		turns = new Label("Turns: 0/" + maxTurns, skin);
-		newGame = new TextButton("New Game!", skin);
-		highScore = new TextButton("High Scores", skin);
+		BitmapFont bitmap = new BitmapFont(Gdx.files.internal("data/font.fnt"), Gdx.files.internal("data/font.png"), false);
+		Color color = new Color(0, 1, 1, 1);
+		LabelStyle style = new LabelStyle(bitmap, color);
+
+		TextButtonStyle tstyle = new TextButtonStyle();
+
+		score = new Label("Score: 0", style);
+		match = new Label("Matched: 0", style);
+		turnsOrTimer = new Label("Turns: 0/" + maxTurns, style);
+		newGameTurn = new TextButton("New TURN Game!", skin);
+		newGameTime = new TextButton("New TIME Game!", skin);
+		highScoreTurn = new TextButton("High Scores TURN", skin);
+		highScoreTime = new TextButton("High Scores TIME", skin);
 
 		stage.addActor(score);
-		score.setPosition(35, 920);
-		score.setFontScale(3);
+		score.setPosition(35, 895);
+		score.setFontScale((float) .6);
 
 		stage.addActor(match);
-		match.setPosition(35, 850);
-		match.setFontScale(3);
+		match.setPosition(35, 820);
+		match.setFontScale((float) .6);
 
-		stage.addActor(turns);
-		turns.setPosition(350, 920);
-		turns.setFontScale(3);
+		stage.addActor(turnsOrTimer);
+		turnsOrTimer.setPosition(350, 895);
+		turnsOrTimer.setFontScale((float) .5);
 
-		stage.addActor(newGame);
-		newGame.setBounds(750, 900, 200, 70);
-		newGame.addListener(new ClickListener() {
+		stage.addActor(newGameTurn);
+		newGameTurn.setBounds(630, 910, 170, 65);
+		newGameTurn.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
+				turnGame = true;
 				score.setText("Score: 0");
 				match.setText("Matched: 0");
-				turns.setText("Turns: 0/" + maxTurns);
+				turnsOrTimer.setText("Turns: 0/" + maxTurns);
 				numberOfTurns = 0;
 				numberOfOrbsMatched = 0;
 				actionResolver.showToast("New Game", 5000);
 			}
 		});
 
-		stage.addActor(highScore);
-		highScore.setBounds(750, 820, 200, 70);
-		highScore.addListener(new ClickListener() {
+		stage.addActor(highScoreTurn);
+		highScoreTurn.setBounds(820, 910, 170, 65);
+		highScoreTurn.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
 				StringBuilder sb = new StringBuilder();
-				for (HighScore score : highScoreList) {
+				for (HighScore score : highScoreListTurn) {
 					sb.append(System.getProperty("line.separator"));
 					sb.append(score.getHighScoreString());
 				}
 				actionResolver.showAlertBox("High Scores -  5 Turns", sb.toString(), "Return");
+			}
+		});
+
+		stage.addActor(newGameTime);
+		newGameTime.setBounds(630, 830, 170, 65);
+		newGameTime.addListener(new ClickListener() {
+			@Override
+			public void clicked(InputEvent event, float x, float y) {
+				turnGame = false;
+				time = new Timer(maxTime);
+				score.setText("Score: 0");
+				match.setText("Matched: 0");
+				turnsOrTimer.setText("Time: 0");
+				numberOfOrbsMatched = 0;
+				actionResolver.showToast("New Game", 5000);
+			}
+		});
+
+		stage.addActor(highScoreTime);
+		highScoreTime.setBounds(820, 830, 170, 65);
+		highScoreTime.addListener(new ClickListener() {
+			@Override
+			public void clicked(InputEvent event, float x, float y) {
+				StringBuilder sb = new StringBuilder();
+				for (HighScore score : highScoreListTime) {
+					sb.append(System.getProperty("line.separator"));
+					sb.append(score.getHighScoreString());
+				}
+				actionResolver.showAlertBox("High Scores -  Timed", sb.toString(), "Return");
 			}
 		});
 
@@ -146,7 +198,6 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		Gdx.input.setInputProcessor(inputMult);
 	}
 
-	
 	@Override
 	public void dispose() {
 		shapeRenderer.dispose();
@@ -170,6 +221,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 			for (int column = 0; column < columns; column++) {
 				if (orbs[row][column].getTaken()) {
 					orbs[row][column].getAnimatedSprite().draw(batch);
+					orbs[row][column].getAnimatedSprite().play();
 					match.setText("Matched: " + getNumberOfMatches(orbs));
 					if (orbs[row][column].getAnimatedSprite().isAnimationFinished()) {
 						numberOfOrbsMatched += getNumberOfMatches(orbs);
@@ -186,21 +238,41 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 
 		batch.end();
 
-		if (numberOfTurns >= maxTurns && getNumberOfMatches(orbs) == 0) {
-			score.setText("Score: 0");
-			match.setText("Matched: 0");
-			turns.setText("Turns: 0/" + maxTurns);
-			numberOfTurns = 0;
+		if (turnGame) {
+			if (numberOfTurns >= maxTurns && getNumberOfMatches(orbs) == 0) {
+				numberOfTurns = 0;
+				tempNumber = numberOfOrbsMatched;
 
-			tempNumber = numberOfOrbsMatched;
-
-			if (tempNumber > (highScoreList.get(highScoreList.size() - 1).getScore())) {
-				Gdx.input.getTextInput(this, "New High Score!", "AAA");
-			} else {
-				actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
+				if (tempNumber > (highScoreListTurn.get(highScoreListTurn.size() - 1).getScore())) {
+					Gdx.input.getTextInput(this, "New High Score of " + tempNumber, "AAA");
+				} else {
+					actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
+				}
+				score.setText("Score: 0");
+				match.setText("Matched: 0");
+				turnsOrTimer.setText("Turns: 0/" + maxTurns);
+				numberOfOrbsMatched = 0;
 			}
+		} else {
+			if (time.isRunning()) {
+				turnsOrTimer.setText("Time: " + time.getTime());
+				if (time.getTime() >= maxTime && getNumberOfMatches(orbs) == 0) {
+					time = new Timer(maxTime);
 
-			numberOfOrbsMatched = 0;
+					tempNumber = numberOfOrbsMatched;
+
+					if (tempNumber > (highScoreListTime.get(highScoreListTime.size() - 1).getScore())) {
+						Gdx.input.getTextInput(this, "New High Score of " + tempNumber, "AAA");
+					} else {
+						actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
+					}
+					score.setText("Score: 0");
+					match.setText("Matched: 0");
+					turnsOrTimer.setText("Time: 0");
+
+					numberOfOrbsMatched = 0;
+				}
+			}
 		}
 
 	}
@@ -210,14 +282,27 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 	@Override
 	public void input(String text) {
 		HighScore scoreToAdd = new HighScore(text, tempNumber);
-		for (int i = highScoreList.size() - 1; i > 0; i--) {
-			if (scoreToAdd.getScore() > highScoreList.get(i).getScore()
-					&& scoreToAdd.getScore() < highScoreList.get(i - 1).getScore()) {
-				highScoreList.add(i, scoreToAdd);
-				highScoreList.remove(highScoreList.size() - 1);
-				setPreferences();
+
+		if (turnGame) {
+			for (int i = highScoreListTurn.size() - 1; i > 0; i--) {
+				if (scoreToAdd.getScore() > highScoreListTurn.get(i).getScore()
+						&& scoreToAdd.getScore() < highScoreListTurn.get(i - 1).getScore()) {
+					highScoreListTurn.add(i, scoreToAdd);
+					highScoreListTurn.remove(highScoreListTurn.size() - 1);
+					setPreferences();
+				}
+			}
+		} else {
+			for (int i = highScoreListTime.size() - 1; i > 0; i--) {
+				if (scoreToAdd.getScore() > highScoreListTime.get(i).getScore()
+						&& scoreToAdd.getScore() < highScoreListTime.get(i - 1).getScore()) {
+					highScoreListTime.add(i, scoreToAdd);
+					highScoreListTime.remove(highScoreListTime.size() - 1);
+					setPreferences();
+				}
 			}
 		}
+
 	}
 
 	@Override
@@ -225,35 +310,50 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		// TODO Auto-generated method stub
 
 	}
-	
+
 	private void createHighScoreList() {
-		highScoreList = new ArrayList<HighScore>();
+		highScoreListTurn = new ArrayList<HighScore>();
+		highScoreListTime = new ArrayList<HighScore>();
+
 		Preferences prefs = Gdx.app.getPreferences("Scores");
 		if (prefs.getInteger("score0") == 0) {
-			highScoreList.add(new HighScore("RAH", 100));
-			highScoreList.add(new HighScore("BLH", 80));
-			highScoreList.add(new HighScore("GMP", 60));
-			highScoreList.add(new HighScore("LMW", 50));
-			highScoreList.add(new HighScore("RAH", 40));
-			highScoreList.add(new HighScore("ABC", 30));
-			highScoreList.add(new HighScore("ABC", 20));
-			highScoreList.add(new HighScore("ABC", 15));
-			highScoreList.add(new HighScore("ABC", 10));
-			highScoreList.add(new HighScore("ABC", 5));
+			highScoreListTurn.add(new HighScore("RAH", 100));
+			highScoreListTurn.add(new HighScore("BLH", 80));
+			highScoreListTurn.add(new HighScore("GMP", 60));
+			highScoreListTurn.add(new HighScore("LMW", 50));
+			highScoreListTurn.add(new HighScore("RAH", 40));
+			highScoreListTurn.add(new HighScore("ABC", 30));
+			highScoreListTurn.add(new HighScore("ABC", 20));
+			highScoreListTurn.add(new HighScore("ABC", 15));
+			highScoreListTurn.add(new HighScore("ABC", 10));
+			highScoreListTurn.add(new HighScore("ABC", 5));
+
+			highScoreListTime.add(new HighScore("RAH", 100));
+			highScoreListTime.add(new HighScore("BLH", 85));
+			highScoreListTime.add(new HighScore("GMP", 65));
+			highScoreListTime.add(new HighScore("LMW", 55));
+			highScoreListTime.add(new HighScore("RAH", 45));
+			highScoreListTime.add(new HighScore("ABC", 35));
+			highScoreListTime.add(new HighScore("ABC", 25));
+			highScoreListTime.add(new HighScore("ABC", 15));
+			highScoreListTime.add(new HighScore("ABC", 10));
+			highScoreListTime.add(new HighScore("ABC", 5));
 		} else {
 			for (int i = 0; i < 10; i++) {
-				highScoreList.add(new HighScore(prefs.getString("name" + i), prefs.getInteger("score" + i)));
+				highScoreListTurn.add(new HighScore(prefs.getString("name" + i), prefs.getInteger("score" + i)));
+				highScoreListTime.add(new HighScore(prefs.getString("_name" + i), prefs.getInteger("_score" + i)));
 			}
 		}
 		setPreferences();
 	}
 
-
 	private void setPreferences() {
 		Preferences prefs = Gdx.app.getPreferences("Scores");
-		for (int i = 0; i < highScoreList.size(); i++) {
-			prefs.putString("name" + i, highScoreList.get(i).getName());
-			prefs.putInteger("score" + i, highScoreList.get(i).getScore());
+		for (int i = 0; i < highScoreListTurn.size(); i++) {
+			prefs.putString("name" + i, highScoreListTurn.get(i).getName());
+			prefs.putInteger("score" + i, highScoreListTurn.get(i).getScore());
+			prefs.putString("_name" + i, highScoreListTime.get(i).getName());
+			prefs.putInteger("_score" + i, highScoreListTime.get(i).getScore());
 		}
 		prefs.flush();
 	}
@@ -276,6 +376,19 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		if (currentOrb == null)
 			currentOrb = getOrb(touchX, touchY);
 
+		for (int row = 0; row < rows; row++) {
+			for (int column = 0; column < columns; column++) {
+				if (orbs[row][column].getAnimatedSprite().isPlaying() || numberOfTurns >= maxTurns ) {
+					
+					currentOrb = null;
+				}
+			}
+		}
+
+		if (turnGame == false && time.isRunning() == false) {
+			time.start();
+		}
+
 		return true;
 	}
 
@@ -285,8 +398,12 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 			currentOrb.setPosition(currentOrb.getLocation().x, currentOrb.getLocation().y);
 		currentOrb = null;
 
-		numberOfTurns++;
-		turns.setText("Turns: " + numberOfTurns + "/" + maxTurns);
+		if (turnGame) {
+			numberOfTurns++;
+			turnsOrTimer.setText("Turns: " + numberOfTurns + "/" + maxTurns);
+		} else {
+
+		}
 
 		checkForMatches(orbs);
 		int orbsToDelete = getNumberOfMatches(orbs);

@@ -20,6 +20,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Button.ButtonStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -70,7 +71,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		this.actionResolver = actionResolver;
 		myGame = myGdxGame;
 		create();
-		actionResolver.showToast("Go!", 5000);
+		actionResolver.showToast("Go!", 4000);
 	}
 
 	public GameScreen() {
@@ -111,11 +112,11 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		BitmapFont bitmap = new BitmapFont(Gdx.files.internal("data/font.fnt"), Gdx.files.internal("data/font.png"), false);
 		Color color = new Color(0, 1, 1, 1);
 		LabelStyle style = new LabelStyle(bitmap, color);
-
-		TextButtonStyle tstyle = new TextButtonStyle();
+		
+		Color grey = new Color(100,100,100,(float) 0.5);
 
 		score = new Label("Score: 0", style);
-		match = new Label("Matched: 0", style);
+		match = new Label("Last Matched: 0", style);
 		turnsOrTimer = new Label("Turns: 0/" + maxTurns, style);
 		newGameTurn = new TextButton("New TURN Game!", skin);
 		newGameTime = new TextButton("New TIME Game!", skin);
@@ -135,21 +136,23 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		turnsOrTimer.setFontScale((float) .5);
 
 		stage.addActor(newGameTurn);
+		newGameTurn.setColor(Color.BLUE);
 		newGameTurn.setBounds(630, 910, 170, 65);
 		newGameTurn.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
 				turnGame = true;
 				score.setText("Score: 0");
-				match.setText("Matched: 0");
+				match.setText("Last Matched: 0");
 				turnsOrTimer.setText("Turns: 0/" + maxTurns);
 				numberOfTurns = 0;
 				numberOfOrbsMatched = 0;
-				actionResolver.showToast("New Game", 5000);
+				actionResolver.showToast("You have 5 Turns", 3000);
 			}
 		});
 
 		stage.addActor(highScoreTurn);
+		highScoreTurn.setColor(Color.GREEN);
 		highScoreTurn.setBounds(820, 910, 170, 65);
 		highScoreTurn.addListener(new ClickListener() {
 			@Override
@@ -164,6 +167,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 		});
 
 		stage.addActor(newGameTime);
+		newGameTime.setColor(Color.RED);
 		newGameTime.setBounds(630, 830, 170, 65);
 		newGameTime.addListener(new ClickListener() {
 			@Override
@@ -171,14 +175,15 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 				turnGame = false;
 				time = new Timer(maxTime);
 				score.setText("Score: 0");
-				match.setText("Matched: 0");
-				turnsOrTimer.setText("Time: 0");
+				match.setText("Last Matched: 0");
+				turnsOrTimer.setText("Time: " + maxTime);
 				numberOfOrbsMatched = 0;
-				actionResolver.showToast("New Game", 5000);
+				actionResolver.showToast("You have 30 seconds", 3000);
 			}
 		});
 
 		stage.addActor(highScoreTime);
+		highScoreTime.setColor(Color.YELLOW);
 		highScoreTime.setBounds(820, 830, 170, 65);
 		highScoreTime.addListener(new ClickListener() {
 			@Override
@@ -222,7 +227,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 				if (orbs[row][column].getTaken()) {
 					orbs[row][column].getAnimatedSprite().draw(batch);
 					orbs[row][column].getAnimatedSprite().play();
-					match.setText("Matched: " + getNumberOfMatches(orbs));
+					match.setText("Last Matched: " + getNumberOfMatches(orbs));
 					if (orbs[row][column].getAnimatedSprite().isAnimationFinished()) {
 						numberOfOrbsMatched += getNumberOfMatches(orbs);
 						resetMatchedOrbs(orbs);
@@ -249,13 +254,13 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 					actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
 				}
 				score.setText("Score: 0");
-				match.setText("Matched: 0");
+				match.setText("Last Matched: 0");
 				turnsOrTimer.setText("Turns: 0/" + maxTurns);
 				numberOfOrbsMatched = 0;
 			}
 		} else {
 			if (time.isRunning()) {
-				turnsOrTimer.setText("Time: " + time.getTime());
+				turnsOrTimer.setText("Time: " + (30 - time.getTime()));
 				if (time.getTime() >= maxTime && getNumberOfMatches(orbs) == 0) {
 					time = new Timer(maxTime);
 
@@ -267,8 +272,8 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 						actionResolver.showAlertBox("Game Over", score.getText() + " orbs", "Try Again");
 					}
 					score.setText("Score: 0");
-					match.setText("Matched: 0");
-					turnsOrTimer.setText("Time: 0");
+					match.setText("Last Matched: 0");
+					turnsOrTimer.setText("Time: " + maxTime);
 
 					numberOfOrbsMatched = 0;
 				}
@@ -407,7 +412,7 @@ public class GameScreen implements InputProcessor, Screen, TextInputListener {
 
 		checkForMatches(orbs);
 		int orbsToDelete = getNumberOfMatches(orbs);
-		match.setText("Matched: " + orbsToDelete);
+		match.setText("Last Matched: " + orbsToDelete);
 
 		return true;
 	}

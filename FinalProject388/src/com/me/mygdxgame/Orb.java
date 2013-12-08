@@ -41,7 +41,7 @@ public class Orb extends Sprite {
 				walkFrames[index++] = tmp[i][j];
 			}
 		}
-		walkAnimation = new Animation(0.07f, walkFrames);
+		walkAnimation = new Animation(0.08f, walkFrames);
 		walkAnimation.setPlayMode(Animation.NORMAL);
 		as = new AnimatedSprite(walkAnimation);
 		as.setPlaying(false);
